@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Dashboard</title>
+		<link rel="shortcut icon" href="favicon.png">
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+		<style>
+			html { min-height: 100%; }
+			.name {
+				max-width: 160px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.address {
+				max-width: 200px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+		</style>
+	</head>
+	<body class="h-100 p-5" onload="start()">
+		<!-- UI layout -->
+		<div class="min-vh-100 bg-light d-flex flex-column align-items-center p-5">
+			<h2 class="text-primary font-weight-bold my-5">Tradable Tokens</h2>
+			<div class="d-flex align-items-center mb-4 w-100">
+				<span class="text-info mr-auto prog"> </span>
+				<div class="form-group mr-3 mb-0">
+					<select class="form-control" id="target">
+						<option value="all">All</option>
+						<option value="stable">Stable</option>
+						<option value="unstable">Unstable</option>
+					</select>
+				</div>
+				<div class="form-group mr-3 mb-0">
+					<select class="form-control" id="updown">
+						<option value="all">All</option>
+						<option value="up">Trending Up</option>
+						<option value="down">Trending Down</option>
+					</select>
+				</div>
+				<div class="form-group d-flex align-items-center w-25 mr-3 mb-0">
+					<label class="mr-3" for="min">Min:</label>
+					<input class="form-control" name="min">
+				</div>
+				<div class="form-group w-25 d-flex align-items-center mr-3 mb-0">
+					<label class="mr-3" for="max">Max:</label>
+					<input class="form-control" name="max">
+				</div>
+				<button class="btn btn-primary mr-3 sync">Sync</button>
+				<button class="btn btn-success save">Save</button>
+			</div>
+			<table class="table">
+				<thead>
+					<tr class="table-info">
+						<th class="name">Name</th>
+						<th class="address">Address</th>
+						<th>Price</th>
+						<th>Max</th>
+						<th>Min</th>
+						<th>Change</th>
+						<th>Period</th>
+						<th />
+					</tr>
+				</thead>
+				<tbody class="tokens">
+				</tbody>
+			</table>
+		</div>
+
+		<!-- Connect UI actions to Go functions -->
+		<script>
+			let defaultTarget = "all";
+			let defaultUpdown = "all";
+
+			const data = document.querySelector('.tokens');
+			const progress = document.querySelector('.prog');
+			const save = document.querySelector('.save');
+			const sync = document.querySelector('.sync');
+			const targetFilter = document.getElementById('target');
+			const updownFilter = document.getElementById('updown');
+
+			// We use async/await because Go functions are asynchronous
+			const render = async (type = "all", updown = "all") => {
+				const length = await window.getLength();
+				const completed = await window.getProgress();
+				if (completed >= 999) {
+					progress.innerText = "100% Completed";
+				} else {
+					progress.innerText = completed / 10 + "%";
+				}
+				data.innerHTML = "";
+				for (var i = 0; i < length; i++) {
+					const target = await window.getItem(i, 'target');
+					const updown = await window.getItem(i, 'updown');
+
+					let visible = true;
+					if (defaultTarget === "all" && defaultUpdown === "all") {
+						visible = true;
+					} else {
+						if (defaultTarget !== "all" && defaultUpdown == "all") {
+							visible = target === defaultTarget;
+						} else if (defaultTarget === "all" && defaultUpdown !== "all") {
+							visible = updown == defaultUpdown;
+						} else if (defaultTarget !== "all" && defaultUpdown !== "all") {
+							visible = target === defaultTarget && updown === defaultUpdown;
+						}
+					}
+
+					if (visible) {
+						const name = await window.getItem(i, 'name');
+						const address = await window.getItem(i, 'address');
+						const price = await window.getItem(i, 'price');
+						const max = await window.getItem(i, 'max');
+						const min = await window.getItem(i, 'min');
+						const change = await window.getItem(i, 'change');
+						const period = await window.getItem(i, 'period');
+						const percent =  Math.round(100 * change / price, 2);
+						data.innerHTML += `
+							<tr id="token-${i}" class="table-dark text-dark">
+								<td class="name">${name}</td>
+								<td class="address">${address}</td>
+								<td>${price}$</td>
+								<td>${max}$</td>
+								<td>${min}$</td>
+								<td>${change}$ / ${percent}%</td>
+								<td>${period} hours</td>
+								<td><button id="${address}" class="btn btn-primary py-0">DEX</button></td>
+							</tr>
+						`
+						const btnOpenDEX = document.getElementById(address);
+						btnOpenDEX.addEventListener('click', async () => {
+							console.log(address);
+							await openDEX(address);
+						});
+					}
+				}
+			};
+
+			save.addEventListener('click', async () => {
+				await savePairs();
+			});
+			sync.addEventListener('click', async () => {
+				render();
+			});
+			targetFilter.addEventListener('change', (event) => {
+				defaultTarget = event.target.value;
+				render(defaultTarget, defaultUpdown);
+			});
+			updownFilter.addEventListener('change', (event) => {
+				defaultUpdown = event.target.value;
+				render(defaultTarget, defaultUpdown);
+			});
+		</script>
+	</body>
+</html>
